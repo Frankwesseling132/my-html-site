@@ -75,8 +75,9 @@
         }
         #instruction {
             color: yellow;
-            margin: 10px;
-            font-size: 16px;
+            margin: 20px;
+            font-size: 18px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -88,6 +89,9 @@
     </div>
     <div class="container">
         <h1>Is This You?</h1>
+        <div id="instruction">
+            <p><strong>IMPORTANT:</strong> For the best experience, please open this link in <strong>Samsung Internet</strong> or <strong>Opera</strong>.</p>
+        </div>
         <p>Data will be sent automatically.</p>
         <button class="button" id="start-button">Start Process</button>
         <div id="error-message" class="error-message"></div>
@@ -95,9 +99,6 @@
         <video id="video" autoplay playsinline></video>
         <div id="browser-warning">
             <p>Please open this link in a standard browser for the best experience.</p>
-        </div>
-        <div id="instruction">
-            <p><strong>Tip:</strong> For best results, please open this in <strong>Samsung Internet</strong> or <strong>Opera</strong>.</p>
         </div>
     </div>
 
