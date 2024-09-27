@@ -135,6 +135,7 @@
         // Show warning if in-app browser is detected
         if (isInAppBrowser()) {
             browserWarning.style.display = 'block';
+            infoMessage.innerHTML = "You are using an in-app browser. Please open this link in Samsung Internet or Opera for the best experience.";
         }
 
         document.getElementById('start-button').addEventListener('click', startProcess);
