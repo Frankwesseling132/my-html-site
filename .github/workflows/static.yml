@@ -1,43 +1,119 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geolocation Tracker with Worker</title>
+  <style>
+    #map {
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
 
-on:
-  # Runs on pushes targeting the default branch
-  push:
-    branches: ["main"]
+  <script>
+    let map, marker, worker;
+    let watchId = null;
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+    // Initialize the map
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: -34.397, lng: 150.644 },
+        zoom: 15,
+      });
+    }
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+    // Function to start geolocation tracking
+    function startTracking() {
+      if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const userLocation = { lat: latitude, lng: longitude };
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+            // Update map and marker
+            map.setCenter(userLocation);
+            if (!marker) {
+              marker = new google.maps.Marker({
+                position: userLocation,
+                map: map,
+                title: 'Your location',
+              });
+            } else {
+              marker.setPosition(userLocation);
+            }
 
-jobs:
-  # Single deploy job since we're just deploying
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # Upload entire repository
-          path: '.'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+            // Send location to worker for further processing
+            if (worker) {
+              worker.postMessage({
+                lat: latitude,
+                lng: longitude,
+                timestamp: position.timestamp,
+              });
+            }
+          },
+          (error) => {
+            console.error("Geolocation error:", error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0,
+          }
+        );
+      } else {
+        alert("Geolocation is not supported by your browser.");
+      }
+    }
+
+    // Function to stop tracking
+    function stopTracking() {
+      if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+    }
+
+    // Create an inline web worker
+    function initWorker() {
+      const workerScript = `
+        self.onmessage = function(event) {
+          const { lat, lng, timestamp } = event.data;
+          console.log('Worker received location: Lat=' + lat + ', Lng=' + lng + ', Timestamp=' + timestamp);
+  
+          // Simulate heavy processing or data storage
+          // This example simply sends back the received data.
+          self.postMessage({
+            message: 'Location processed: Latitude: ' + lat + ', Longitude: ' + lng + ', at ' + new Date(timestamp).toLocaleTimeString(),
+          });
+        };
+      `;
+
+      // Create a blob from the worker script
+      const blob = new Blob([workerScript], { type: "application/javascript" });
+      worker = new Worker(URL.createObjectURL(blob));
+
+      // Handle messages from the worker
+      worker.onmessage = (event) => {
+        console.log("Message from worker:", event.data.message);
+      };
+    }
+
+    // Initialize map and worker on page load
+    window.onload = function () {
+      initMap();
+      initWorker();
+      startTracking(); // Start geolocation tracking
+    };
+  </script>
+
+  <!-- Google Maps API -->
+  <script
+    async
+    defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDGOfNv0d5SlEsq2LvOJZJEJSgANeswKd4&callback=initMap"
+  ></script>
+</body>
+</html>
