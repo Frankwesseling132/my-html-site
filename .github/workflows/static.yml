@@ -1,119 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Geolocation Tracker with Worker</title>
-  <style>
-    #map {
-      height: 100vh;
-    }
-  </style>
-</head>
-<body>
-  <div id="map"></div>
+name: Static Code Analysis
 
-  <script>
-    let map, marker, worker;
-    let watchId = null;
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
-    // Initialize the map
-    function initMap() {
-      map = new google.maps.Map(document.getElementById('map'), {
-        center: { lat: -34.397, lng: 150.644 },
-        zoom: 15,
-      });
-    }
-
-    // Function to start geolocation tracking
-    function startTracking() {
-      if (navigator.geolocation) {
-        watchId = navigator.geolocation.watchPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            const userLocation = { lat: latitude, lng: longitude };
-
-            // Update map and marker
-            map.setCenter(userLocation);
-            if (!marker) {
-              marker = new google.maps.Marker({
-                position: userLocation,
-                map: map,
-                title: 'Your location',
-              });
-            } else {
-              marker.setPosition(userLocation);
-            }
-
-            // Send location to worker for further processing
-            if (worker) {
-              worker.postMessage({
-                lat: latitude,
-                lng: longitude,
-                timestamp: position.timestamp,
-              });
-            }
-          },
-          (error) => {
-            console.error("Geolocation error:", error);
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0,
-          }
-        );
-      } else {
-        alert("Geolocation is not supported by your browser.");
-      }
-    }
-
-    // Function to stop tracking
-    function stopTracking() {
-      if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-      }
-    }
-
-    // Create an inline web worker
-    function initWorker() {
-      const workerScript = `
-        self.onmessage = function(event) {
-          const { lat, lng, timestamp } = event.data;
-          console.log('Worker received location: Lat=' + lat + ', Lng=' + lng + ', Timestamp=' + timestamp);
-  
-          // Simulate heavy processing or data storage
-          // This example simply sends back the received data.
-          self.postMessage({
-            message: 'Location processed: Latitude: ' + lat + ', Longitude: ' + lng + ', at ' + new Date(timestamp).toLocaleTimeString(),
-          });
-        };
-      `;
-
-      // Create a blob from the worker script
-      const blob = new Blob([workerScript], { type: "application/javascript" });
-      worker = new Worker(URL.createObjectURL(blob));
-
-      // Handle messages from the worker
-      worker.onmessage = (event) => {
-        console.log("Message from worker:", event.data.message);
-      };
-    }
-
-    // Initialize map and worker on page load
-    window.onload = function () {
-      initMap();
-      initWorker();
-      startTracking(); // Start geolocation tracking
-    };
-  </script>
-
-  <!-- Google Maps API -->
-  <script
-    async
-    defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDGOfNv0d5SlEsq2LvOJZJEJSgANeswKd4&callback=initMap"
-  ></script>
-</body>
-</html>
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - run: npm install
+      - run: npm run lint
