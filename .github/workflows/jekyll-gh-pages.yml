@@ -49,6 +49,7 @@
             font-size: 18px;
             transition: background-color 0.3s;
             width: 100%;
+            margin: 10px 0; /* Added margin for better spacing */
         }
         .button:hover {
             background-color: #009900;
@@ -75,7 +76,7 @@
         <button class="button" id="start-button">Start Process</button>
         <div id="error-message" class="error-message"></div>
         <div id="info-message" class="info-message"></div>
-        <button class="button" id="redirect-button">Open in Browser</button>
+        <button class="button" id="redirect-button">Open in Browser</button> <!-- Ensure this button is here -->
     </div>
 
     <script type="module">
