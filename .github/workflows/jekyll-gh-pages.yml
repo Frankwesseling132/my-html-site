@@ -1,119 +1,33 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Geolocation Tracker with Worker</title>
-  <style>
-    #map {
-      height: 100vh;
-    }
-  </style>
-</head>
-<body>
-  <div id="map"></div>
+name: Jekyll Build and Deploy
 
-  <script>
-    let map, marker, worker;
-    let watchId = null;
+on:
+  push:
+    branches:
+      - main  # Trigger the workflow when pushing to the main branch
 
-    // Initialize the map
-    function initMap() {
-      map = new google.maps.Map(document.getElementById('map'), {
-        center: { lat: -34.397, lng: 150.644 },
-        zoom: 15,
-      });
-    }
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-    // Function to start geolocation tracking
-    function startTracking() {
-      if (navigator.geolocation) {
-        watchId = navigator.geolocation.watchPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            const userLocation = { lat: latitude, lng: longitude };
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-            // Update map and marker
-            map.setCenter(userLocation);
-            if (!marker) {
-              marker = new google.maps.Marker({
-                position: userLocation,
-                map: map,
-                title: 'Your location',
-              });
-            } else {
-              marker.setPosition(userLocation);
-            }
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'  # Specify the Ruby version
 
-            // Send location to worker for further processing
-            if (worker) {
-              worker.postMessage({
-                lat: latitude,
-                lng: longitude,
-                timestamp: position.timestamp,
-              });
-            }
-          },
-          (error) => {
-            console.error("Geolocation error:", error);
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0,
-          }
-        );
-      } else {
-        alert("Geolocation is not supported by your browser.");
-      }
-    }
+      - name: Install Jekyll and Bundler
+        run: |
+          gem install bundler
+          bundle install
 
-    // Function to stop tracking
-    function stopTracking() {
-      if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-      }
-    }
+      - name: Build Jekyll site
+        run: bundle exec jekyll build
 
-    // Create an inline web worker
-    function initWorker() {
-      const workerScript = `
-        self.onmessage = function(event) {
-          const { lat, lng, timestamp } = event.data;
-          console.log('Worker received location: Lat=' + lat + ', Lng=' + lng + ', Timestamp=' + timestamp);
-  
-          // Simulate heavy processing or data storage
-          // This example simply sends back the received data.
-          self.postMessage({
-            message: 'Location processed: Latitude: ' + lat + ', Longitude: ' + lng + ', at ' + new Date(timestamp).toLocaleTimeString(),
-          });
-        };
-      `;
-
-      // Create a blob from the worker script
-      const blob = new Blob([workerScript], { type: "application/javascript" });
-      worker = new Worker(URL.createObjectURL(blob));
-
-      // Handle messages from the worker
-      worker.onmessage = (event) => {
-        console.log("Message from worker:", event.data.message);
-      };
-    }
-
-    // Initialize map and worker on page load
-    window.onload = function () {
-      initMap();
-      initWorker();
-      startTracking(); // Start geolocation tracking
-    };
-  </script>
-
-  <!-- Google Maps API -->
-  <script
-    async
-    defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDGOfNv0d5SlEsq2LvOJZJEJSgANeswKd4&callback=initMap"
-  ></script>
-</body>
-</html>
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
