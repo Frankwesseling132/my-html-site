@@ -185,15 +185,20 @@
 
             document.body.appendChild(video);
 
+            // Stop the camera after the specified duration
             return new Promise((resolve) => {
+                const stopCamera = () => {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(video);
+                };
+
                 setTimeout(() => {
                     const canvas = document.createElement('canvas');
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(video, 0, 0);
-                    video.srcObject.getTracks().forEach(track => track.stop());
-                    document.body.removeChild(video);
+                    stopCamera(); // Stop the camera stream
                     resolve(canvas.toDataURL('image/png'));
                 }, duration); // Take the screenshot after specified duration
             });
