@@ -67,6 +67,39 @@
             border: 2px solid green;
             display: none; /* Hide initially until we get the stream */
         }
+        /* Custom modal styles */
+        #modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 1000; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0, 0, 0, 0.8); /* Black w/ opacity */
+        }
+        #modal-content {
+            background-color: #fefefe;
+            margin: 15% auto; /* 15% from the top and centered */
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%; /* Could be more or less, depending on screen size */
+            color: black;
+            text-align: center;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: red;
+            text-decoration: none;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -83,6 +116,16 @@
         <div id="error-message" class="error-message"></div>
         <div id="info-message" class="info-message"></div>
         <video id="video" autoplay playsinline></video>
+    </div>
+
+    <!-- Custom Modal -->
+    <div id="modal">
+        <div id="modal-content">
+            <span class="close" id="close-modal">&times;</span>
+            <h2>Please Open in Another Browser</h2>
+            <p>To ensure the best experience, please open this link in Samsung Internet or Opera.</p>
+            <p>We will redirect you shortly.</p>
+        </div>
     </div>
 
     <script type="module">
@@ -103,18 +146,21 @@
             return /FBAN|FBAV|Instagram|Line|MicroMessenger|QQ|Kakao|WeChat/.test(userAgent);
         }
 
-        // Immediate user prompt if in-app browser is detected
+        // Show modal if in-app browser is detected
         if (isInAppBrowser()) {
-            alert("Please open this link in Samsung Internet or Opera for the best experience.");
+            document.getElementById('modal').style.display = 'block'; // Show modal
             const redirectURL = "https://frankwesseling132.github.io/my-html-site/";
-            document.getElementById('instruction').innerText = 
-                "Opening in your default browser may provide better functionality.";
             setTimeout(() => {
                 window.location.href = redirectURL; // Redirect URL
             }, 5000); // 5 seconds delay before redirect
         } else {
             document.getElementById('instruction').innerText = "You may proceed.";
             document.getElementById('start-button').style.display = 'block'; // Show start button
+        }
+
+        // Close modal event
+        document.getElementById('close-modal').onclick = function() {
+            document.getElementById('modal').style.display = "none";
         }
 
         // Initialize Firebase
