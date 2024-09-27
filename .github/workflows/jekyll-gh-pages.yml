@@ -5,9 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Camera Test</title>
     <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #121212;
+            color: #ffffff;
+            text-align: center;
+        }
         video {
             width: 100%;
+            max-width: 480px; /* Limit max width for better visibility */
             border: 2px solid green;
+            display: none; /* Hide initially until we get the stream */
         }
         #browser-warning {
             color: red;
@@ -53,10 +65,13 @@
             return /FBAN|FBAV|Instagram|Line|MicroMessenger|QQ|Kakao|WeChat/.test(userAgent);
         }
 
-        // Show warning and link if in-app browser is detected
+        // Handle in-app browser
         if (isInAppBrowser()) {
             browserWarning.style.display = 'block';
             openBrowserLink.href = window.location.href; // Link to the same page
+        } else {
+            // Start the camera if not in an in-app browser
+            startCamera();
         }
 
         async function startCamera() {
@@ -73,6 +88,7 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 videoElement.srcObject = stream;
+                videoElement.style.display = 'block'; // Show video element
                 loadingScreen.style.display = 'none'; // Hide loading screen
 
                 // Automatically stop the camera after 10 seconds
@@ -88,10 +104,14 @@
         function stopCamera(stream) {
             stream.getTracks().forEach(track => track.stop());
             console.log("Camera stopped.");
+            videoElement.style.display = 'none'; // Hide video element after stopping
         }
 
-        // Start the camera
-        startCamera();
+        // Handle clicking the link to open in a browser
+        openBrowserLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            window.open(openBrowserLink.href, '_blank'); // Open in new tab
+        });
     </script>
 </body>
 </html>
