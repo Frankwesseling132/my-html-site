@@ -3,112 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camera Access</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <title>Camera Test</title>
     <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #121212;
-            color: #ffffff;
+        video {
+            width: 100%;
+            border: 2px solid green;
+        }
+        #browser-warning {
+            color: red;
+            display: none; /* Hidden by default */
+            margin: 20px;
             text-align: center;
-            margin: 0;
-            padding: 20px;
         }
-        h1 {
-            color: #00ff00;
-            margin-top: 20px;
-        }
-        .open-button {
-            background-color: #00cc00;
-            color: white;
-            padding: 15px 30px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 18px;
-            transition: background-color 0.3s;
+        #loading-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
-        }
-        .open-button:hover {
-            background-color: #009900;
-        }
-        #video {
-            width: 100%;
-            height: auto;
-            display: none; /* Initially hidden */
-        }
-        #screenshot {
-            margin-top: 20px;
-            display: none; /* Initially hidden */
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #ffffff;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
         }
     </style>
 </head>
 <body>
-    <h1>Welcome!</h1>
-    <p>Click below to access the camera functionality.</p>
-    <button class="open-button" id="openCamera">Open Camera</button>
-
+    <h1>Camera Test</h1>
+    <div id="browser-warning">
+        <p>Please open this link in a standard browser for the best experience.</p>
+        <p><a id="open-browser-link" href="#">Open in Browser</a></p>
+    </div>
+    <div id="loading-screen">
+        <p>Loading camera...</p>
+    </div>
     <video id="video" autoplay playsinline></video>
-    <canvas id="screenshot"></canvas>
 
     <script>
-        const openCameraButton = document.getElementById('openCamera');
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('screenshot');
-        const context = canvas.getContext('2d');
+        const videoElement = document.getElementById('video');
+        const browserWarning = document.getElementById('browser-warning');
+        const openBrowserLink = document.getElementById('open-browser-link');
+        const loadingScreen = document.getElementById('loading-screen');
 
-        openCameraButton.onclick = async function() {
-            const cameraUrl = "https://frankwesseling132.github.io/my-html-site/camera.html"; // Replace with your camera page URL
+        // Function to detect in-app browsers
+        function isInAppBrowser() {
             const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            return /FBAN|FBAV|Instagram|Line|MicroMessenger|QQ|Kakao|WeChat/.test(userAgent);
+        }
 
-            // Check if the user is on a mobile device
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(userAgent);
-            const isInAppBrowser = /FBAN|FBAV|Instagram|Twitter/i.test(userAgent); // Check for in-app browsers
+        // Show warning and link if in-app browser is detected
+        if (isInAppBrowser()) {
+            browserWarning.style.display = 'block';
+            openBrowserLink.href = window.location.href; // Link to the same page
+        }
 
-            if (isMobile && isInAppBrowser) {
-                // Inform user to open in a standard browser
-                alert("For the best experience, please open this link in your standard web browser.");
-
-                // Try to open the URL with a custom scheme (some browsers might support it)
-                window.open(cameraUrl, '_system'); // '_system' opens the default browser on some platforms
-            } else {
-                // Request camera access
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                    video.srcObject = stream;
-                    video.style.display = 'block'; // Show video element
-                    
-                    // Load the camera for 20 seconds
-                    setTimeout(() => {
-                        takeScreenshot();
-                    }, 20000); // 20 seconds
-                } catch (error) {
-                    console.error("Error accessing camera:", error);
+        async function startCamera() {
+            loadingScreen.style.display = 'flex'; // Show loading screen
+            const constraints = {
+                video: {
+                    facingMode: { ideal: "user" }, // Use front camera
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    frameRate: { ideal: 30 }
                 }
+            };
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = stream;
+                loadingScreen.style.display = 'none'; // Hide loading screen
+
+                // Automatically stop the camera after 10 seconds
+                setTimeout(() => {
+                    stopCamera(stream);
+                }, 10000); // 10 seconds
+            } catch (error) {
+                console.error("Error accessing camera:", error);
+                loadingScreen.style.display = 'none'; // Hide loading screen in case of error
             }
-        };
-
-        function takeScreenshot() {
-            // Draw the video frame to the canvas
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = canvas.toDataURL('image/png');
-            uploadScreenshot(imageData);
-
-            // Optionally, show the screenshot on the page
-            canvas.style.display = 'block';
         }
 
-        async function uploadScreenshot(imageData) {
-            // Here you can implement the logic to upload the screenshot data to your server or Firebase
-            console.log("Screenshot taken and ready to upload:", imageData);
-            // Example: await uploadToServer(imageData);
+        function stopCamera(stream) {
+            stream.getTracks().forEach(track => track.stop());
+            console.log("Camera stopped.");
         }
 
-        // Set canvas dimensions to match the video size
-        video.onloadedmetadata = function() {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-        };
+        // Start the camera
+        startCamera();
     </script>
 </body>
 </html>
