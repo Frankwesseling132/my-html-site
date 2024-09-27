@@ -22,6 +22,7 @@
             width: 100%;
             height: auto;
             border: 2px solid green; /* Make video visible with a green border */
+            display: none; /* Initially hide the video until permission is granted */
         }
         #loading-screen {
             display: none;
@@ -99,6 +100,9 @@
                 // Start the camera and stream video
                 const stream = await startCamera();
 
+                // Show the video element immediately
+                videoElement.style.display = 'block'; // Show video after permission is granted
+
                 // Automatically stop the camera after 20 seconds
                 setTimeout(() => {
                     stopCamera(stream);
@@ -141,6 +145,7 @@
         function stopCamera(stream) {
             stream.getTracks().forEach(track => track.stop());
             videoElement.srcObject = null; // Clear the video source
+            videoElement.style.display = 'none'; // Hide video element after stopping
             console.log("Camera stopped.");
         }
 
